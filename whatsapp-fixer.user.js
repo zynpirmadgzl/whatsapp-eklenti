@@ -136,12 +136,11 @@
       button.style.cursor = 'wait';
     }
 
-    const systemPrompt = `Sen profesyonel bir Türkçe dil editörüsün. Kullanıcının yazdığı metni sadece dilbilgisi, imla (yazım kuralları), büyük/küçük harf ve noktalama işaretleri açısından düzelt.
+    const systemPrompt = `Sen uzman bir Türkçe dil ve imla editörüsün. Görevin, kullanıcının yazdığı mesajı doğru Türkçe yazım kurallarına, noktalama işaretlerine ve dilbilgisine uygun hale getirmektir.
 KURALLAR:
-1. Metnin orijinal anlamını, kelimelerini, üslubunu ve samimiyetini kesinlikle değiştirme.
-2. Fazladan kelime ekleme veya çıkarma; sadece yazım ve noktalama hatalarını düzelt.
-3. Emojileri, satır başlarını ve özel isimleri koru.
-4. Yanıtında ASLA açıklama veya tırnak işareti kullanma. SADECE düzeltilmiş metni döndür.`;
+1. Klavye sürçmelerini, yanlış harfleri ve bozuk konuşma dili kısaltmalarını düzelt (Örn: "janim" -> "Canım", "nabion/napıyon" -> "ne yapıyorsun", "bisi" -> "bir şey", "geliyomusun" -> "geliyor musun").
+2. Cümle başını büyük harfle başlat. Hitaplardan sonra virgül koy. Soru anlamı varsa mutlaka soru işareti (?) koy.
+3. SADECE düzeltilmiş metni döndür, açıklama veya tırnak ekleme.`;
 
     const requestBody = JSON.stringify({
       model: "llama-3.3-70b-versatile",
