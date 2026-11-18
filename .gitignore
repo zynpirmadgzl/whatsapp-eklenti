@@ -1,0 +1,19 @@
+# Ortam değişkenleri ve gizli anahtarlar
+.env
+.env.local
+.env.*
+*.pem
+*.key
+
+# macOS sistem dosyaları
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Arşivler / Paketler
+*.zip
+*.crx
+
+# Editör / IDE dosyaları
+.vscode/
+.idea/

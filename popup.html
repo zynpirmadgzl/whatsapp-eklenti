@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Yazım Düzeltici</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo-title">
+        <div class="logo-icon">✨</div>
+        <div class="title-group">
+          <h1>Yazım Düzeltici</h1>
+          <span class="badge">Groq AI • Ücretsiz</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- API Key Section -->
+    <section class="card">
+      <div class="card-header">
+        <label for="apiKey">Groq API Anahtarı</label>
+        <span id="apiStatus" class="status-indicator"></span>
+      </div>
+      <div class="input-group">
+        <input type="password" id="apiKey" placeholder="gsk_..." autocomplete="off">
+        <button id="toggleKeyVisibility" type="button" class="btn-icon" title="Göster/Gizle">👁️</button>
+      </div>
+      <div class="helper-text">
+        <a href="https://console.groq.com/keys" target="_blank" class="link">
+          🔑 Ücretsiz API Anahtarı Al (30 sn, Kredi kartsız)
+        </a>
+      </div>
+      <button id="saveKeyBtn" class="btn btn-primary">Kaydet & Doğrula</button>
+    </section>
+
+    <!-- Settings Section -->
+    <section class="card">
+      <h2 class="card-title">Ayarlar</h2>
+
+      <div class="form-group">
+        <label for="modeSelect">Düzeltme Modu</label>
+        <select id="modeSelect">
+          <option value="standard" selected>🎯 Standart (Sadece İmla & Noktalama)</option>
+          <option value="professional">💼 Profesyonel / Resmi Dil</option>
+          <option value="casual">💬 Samimi / Günlük Konuşma</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="modelSelect">Yapay Zeka Modeli</label>
+        <select id="modelSelect">
+          <option value="llama-3.1-8b-instant" selected>Llama 3.1 8B (Aşırı Hızlı - Önerilen)</option>
+          <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile</option>
+          <option value="openai/gpt-oss-120b">GPT-OSS 120B</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- Quick Test Playground -->
+    <section class="card">
+      <h2 class="card-title">Hızlı Test Alanı</h2>
+      <textarea id="testInput" rows="3" placeholder="Örn: bugun saat 3 te bulusalımmı gelicek misin"></textarea>
+      <button id="testBtn" class="btn btn-secondary">Metni Düzelt</button>
+      
+      <div id="testResultWrapper" class="result-box hidden">
+        <div class="result-header">
+          <span>Düzeltilmiş Hali:</span>
+          <button id="copyResultBtn" type="button" class="btn-copy" title="Metni Kopyala">📋 Kopyala</button>
+        </div>
+        <div id="testResult" class="result-content"></div>
+      </div>
+    </section>
+
+    <!-- Footer info -->
+    <footer class="footer">
+      <p>💡 WhatsApp Web'de mesaj kutusundayken <strong>Alt + D</strong> kısayoluyla da anında düzeltebilirsiniz.</p>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
