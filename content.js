@@ -67,10 +67,18 @@
   function setInputText(inputEl, newText) {
     inputEl.focus();
 
-    // 1. WhatsApp Lexical editöründeki tüm metni seç
+    // 1. Kutudaki tüm mevcut metni seç
+    const sel = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(inputEl);
+    sel.removeAllRanges();
+    sel.addRange(range);
     document.execCommand('selectAll', false, null);
 
-    // 2. execCommand insertText ile metni değiştir
+    // 2. Eski metni tamamen sil
+    document.execCommand('delete', false, null);
+
+    // 3. Yeni metni ekle
     let success = false;
     try {
       success = document.execCommand('insertText', false, newText);
@@ -78,9 +86,12 @@
       success = false;
     }
 
-    // 3. Eğer Lexical execCommand'i yuttuysa, gerçek bir Yapıştırma (Paste) olayı simüle et
+    // 4. Kontrol: Eğer eski metin silinmediyse veya yanına eklendiyse
     const currentBoxText = (inputEl.innerText || inputEl.textContent || '').trim();
-    if (!success || !currentBoxText.includes(newText.trim())) {
+    if (!success || currentBoxText !== newText.trim()) {
+      document.execCommand('selectAll', false, null);
+      document.execCommand('delete', false, null);
+
       try {
         const dt = new DataTransfer();
         dt.setData('text/plain', newText);
@@ -93,7 +104,7 @@
       } catch (err) {}
     }
 
-    // 4. Input ve Change olaylarını tetikle (React state senkronizasyonu için)
+    // 5. Input ve Change olaylarını tetikle (React state senkronizasyonu için)
     inputEl.dispatchEvent(new InputEvent('input', {
       bubbles: true,
       cancelable: true,
