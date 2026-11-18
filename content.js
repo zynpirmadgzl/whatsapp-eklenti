@@ -67,14 +67,10 @@
   function setInputText(inputEl, newText) {
     inputEl.focus();
 
-    // 1. Mevcut tüm içeriği seç
-    const range = document.createRange();
-    range.selectNodeContents(inputEl);
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
+    // 1. WhatsApp Lexical editöründeki tüm metni seç
+    document.execCommand('selectAll', false, null);
 
-    // 2. execCommand ile metni değiştir (React/Lexical bunu yerel klavye girdisi olarak algılar)
+    // 2. execCommand insertText ile metni değiştir
     let success = false;
     try {
       success = document.execCommand('insertText', false, newText);
@@ -82,19 +78,29 @@
       success = false;
     }
 
-    // 3. Başarısız olursa InputEvent ve innerText fallback
-    if (!success) {
-      inputEl.innerText = newText;
-      const inputEvent = new InputEvent('input', {
-        bubbles: true,
-        cancelable: true,
-        inputType: 'insertText',
-        data: newText
-      });
-      inputEl.dispatchEvent(inputEvent);
+    // 3. Eğer Lexical execCommand'i yuttuysa, gerçek bir Yapıştırma (Paste) olayı simüle et
+    const currentBoxText = (inputEl.innerText || inputEl.textContent || '').trim();
+    if (!success || !currentBoxText.includes(newText.trim())) {
+      try {
+        const dt = new DataTransfer();
+        dt.setData('text/plain', newText);
+        const pasteEvent = new ClipboardEvent('paste', {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: dt
+        });
+        inputEl.dispatchEvent(pasteEvent);
+      } catch (err) {}
     }
 
-    // Olayları tetikle
+    // 4. Input ve Change olaylarını tetikle (React state senkronizasyonu için)
+    inputEl.dispatchEvent(new InputEvent('input', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'insertText',
+      data: newText
+    }));
+
     inputEl.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
     inputEl.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
   }
