@@ -129,6 +129,12 @@
 
     showToast('Düzeltiliyor... ✨', 'info', 1500);
 
+    if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
+      isFixing = false;
+      showToast('Eklenti güncellendi. Lütfen WhatsApp sayfasını (Cmd + R) ile bir kez yenileyin.', 'error', 4500);
+      return;
+    }
+
     try {
       chrome.runtime.sendMessage({
         action: 'correctText',
@@ -142,7 +148,12 @@
             button.innerHTML = WAND_SVG;
             button.setAttribute('title', 'Yazımı & Noktalamayı Düzelt (Option + D)');
           }
-          showToast('Eklenti iletişim hatası: ' + chrome.runtime.lastError.message, 'error');
+          const msg = chrome.runtime.lastError.message || '';
+          if (msg.includes('context invalidated') || msg.includes('Extension')) {
+            showToast('Lütfen WhatsApp sayfasını (Cmd + R) ile bir kez yenileyin.', 'error', 4500);
+          } else {
+            showToast('Eklenti iletişim hatası: ' + msg, 'error');
+          }
           return;
         }
 
@@ -177,7 +188,11 @@
         button.classList.remove('wa-fixer-loading');
         button.innerHTML = WAND_SVG;
       }
-      showToast('Beklenmeyen hata: ' + err.message, 'error');
+      if (err.message && (err.message.includes('sendMessage') || err.message.includes('context invalidated'))) {
+        showToast('Eklenti güncellendi. Lütfen WhatsApp sayfasını (Cmd + R) ile yenileyin.', 'error', 4500);
+      } else {
+        showToast('Beklenmeyen hata: ' + err.message, 'error');
+      }
     }
   }
 
