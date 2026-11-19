@@ -85,13 +85,33 @@
   }
 
   function setInputText(inputEl, newText) {
+    if (!inputEl) return;
     inputEl.focus();
-    const range = document.createRange();
-    range.selectNodeContents(inputEl);
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
 
+    // 1. Kutudaki tüm mevcut metin düğümlerini bulup baştan sona seç
+    const sel = window.getSelection();
+    const range = document.createRange();
+
+    const walker = document.createTreeWalker(inputEl, NodeFilter.SHOW_TEXT, null, false);
+    let firstNode = null;
+    let lastNode = null;
+    while (walker.nextNode()) {
+      if (!firstNode) firstNode = walker.currentNode;
+      lastNode = walker.currentNode;
+    }
+
+    if (firstNode && lastNode) {
+      range.setStart(firstNode, 0);
+      range.setEnd(lastNode, lastNode.textContent.length);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } else {
+      range.selectNodeContents(inputEl);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+
+    // 2. Metni yerleştir: Önce execCommand insertText dene (seçili metni silip yerine yenisini yazar)
     let success = false;
     try {
       success = document.execCommand('insertText', false, newText);
@@ -99,11 +119,30 @@
       success = false;
     }
 
+    // 3. Eğer execCommand başarısız olduysa, DataTransfer Paste olayını kullan
     if (!success) {
-      inputEl.innerText = newText;
-      inputEl.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: newText }));
+      try {
+        const dt = new DataTransfer();
+        dt.setData('text/plain', newText);
+        const pasteEvent = new ClipboardEvent('paste', {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          clipboardData: dt
+        });
+        inputEl.dispatchEvent(pasteEvent);
+        success = true;
+      } catch (err) {
+        success = false;
+      }
     }
 
+    // 4. Son çare fallback
+    if (!success) {
+      inputEl.innerText = newText;
+    }
+
+    // 5. WhatsApp / React senkronizasyonu için genel eventleri tetikle
     inputEl.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
     inputEl.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
   }

@@ -14,12 +14,18 @@ GÖREVLER VE KURALLAR:
 3. Noktalama ve Büyük/Küçük Harf:
    - Cümle başlarını büyük harfle başlat.
    - Hitaplardan sonra virgül koy (Örn: "Canım, ne yapıyorsun?").
-   - Eğer cümle soru anlamı taşıyorsa mutlaka soru işareti (?) kullan, nokta koyma.
+   - Cümle soru anlamı taşımıyorsa kesinlikle soru işareti koyma, nokta koy. Sadece gerçek soru anlamı taşıyan cümlelerde soru işareti (?) kullan.
    - "de/da", "ki" bağlaçlarını ve soru eki olan "mi/mı/mu/mü" eklerini kuralına göre ayır.
 4. Emojileri Koru: Metindeki emojileri kesinlikle silme veya değiştirme.
-5. SADECE DÜZELTİLMİŞ METNİ DÖNDÜR: Yanıtında ASLA açıklama, tırnak işareti, selamlama veya 'Düzeltilmiş hali:' gibi eklemeler yapma. Yalnızca düzeltilmiş ham cümleyi ver.
+5. SADECE DÜZELTİLMİŞ METNİ DÖNDÜR: Yanıtında ASLA açıklama, tırnak işareti, selamlama veya 'Düzeltilmiş hali:' gibi eklemeler yapma. Yalnızca düzeltilmiş ham cümleyi ver. Metni ASLA art arda tekrarlama.
 
 ÖRNEKLER:
+Girdi: mudur erdi simdi geliyor
+Çıktı: Müdür Erdi şimdi geliyor.
+
+Girdi: yarin ofise gec gelicem haberin olsun
+Çıktı: Yarın ofise geç geleceğim, haberin olsun.
+
 Girdi: janim nabion.
 Çıktı: Canım, ne yapıyorsun?
 
@@ -29,8 +35,8 @@ Girdi: yarin aksam geliyomusun saat 8 de
 Girdi: bisi dicem sana ama kizmicaksin tmm mi
 Çıktı: Bir şey diyeceğim sana ama kızmayacaksın, tamam mı?
 
-Girdi: naber kanka naptin bugun
-Çıktı: Naber kanka, ne yaptın bugün?`,
+Girdi: raporu gonderdim kontrol edebilirsin
+Çıktı: Raporu gönderdim, kontrol edebilirsin.`,
 
   professional: `Sen kurumsal iletişim uzmanı bir Türkçe editörüsün. Kullanıcının yazdığı metni dilbilgisi, imla ve noktalama açısından kusursuz, resmi ve nazik bir Türkçe ile yeniden düzenle. Sokak dilini ve kısaltmaları profesyonel kurumsal Türkçeye çevir. Açıklama yapmadan sadece düzeltilmiş metni döndür.`,
 
@@ -85,12 +91,36 @@ async function callGroqApi(apiKey, model, systemPrompt, text) {
         { role: "user", content: text }
       ],
       temperature: 0.2,
-      max_tokens: 2048
+      max_tokens: 1024,
+      presence_penalty: 0.1,
+      frequency_penalty: 0.1
     })
   });
 
   const data = await response.json();
   return { ok: response.ok, status: response.status, data };
+}
+
+function cleanAndDeduplicate(text) {
+  if (!text) return text;
+  let str = text.trim();
+
+  // Baştaki ve sondaki tırnakları temizle
+  if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
+    str = str.slice(1, -1).trim();
+  }
+
+  // Eğer model aynı cümleyi boşluksuz veya boşluklu olarak 2 veya daha fazla kez art arda tekrarladıysa temizle
+  // Örneğin: "Müdürüm, erdi, gelip?Müdürüm, erdi, gelip?Müdürüm, erdi, gelip?" -> "Müdürüm, erdi, gelip?"
+  for (let len = 3; len <= Math.floor(str.length / 2); len++) {
+    const chunk = str.slice(0, len);
+    const parts = str.split(chunk);
+    if (parts.length > 2 && parts.every(p => p === '' || p === ' ')) {
+      return chunk.trim();
+    }
+  }
+
+  return str;
 }
 
 async function handleTextCorrection(request) {
@@ -140,12 +170,8 @@ async function handleTextCorrection(request) {
       }
     }
 
-    let correctedText = apiResult.data.choices?.[0]?.message?.content?.trim() || text;
-
-    // Model baştan/sondan tırnak koyduysa ve orijinal metin tırnakla başlamadıysa temizle
-    if (correctedText.startsWith('"') && correctedText.endsWith('"') && !text.startsWith('"')) {
-      correctedText = correctedText.slice(1, -1).trim();
-    }
+    let rawCorrected = apiResult.data.choices?.[0]?.message?.content?.trim() || text;
+    let correctedText = cleanAndDeduplicate(rawCorrected);
 
     return {
       success: true,

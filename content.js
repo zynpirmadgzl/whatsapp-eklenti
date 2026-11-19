@@ -30,12 +30,19 @@
   // Mesaj giriş kutusunu bulma fonksiyonu
   function getChatInput() {
     if (document.activeElement && document.activeElement.isContentEditable) {
-      return document.activeElement.closest('[contenteditable="true"]') || document.activeElement;
+      const closest = document.activeElement.closest('[contenteditable="true"]');
+      if (closest && closest.closest('#main, footer')) {
+        return closest;
+      }
+      if (document.activeElement.closest('#main, footer')) {
+        return document.activeElement;
+      }
     }
-    return document.querySelector('footer div[contenteditable="true"]') ||
+    return document.querySelector('#main footer [contenteditable="true"]') ||
+           document.querySelector('#main div[contenteditable="true"][data-lexical-editor="true"]') ||
+           document.querySelector('#main [contenteditable="true"][role="textbox"]') ||
+           document.querySelector('#main [contenteditable="true"]') ||
            document.querySelector('footer [contenteditable="true"]') ||
-           document.querySelector('div[role="textbox"][contenteditable="true"]') ||
-           document.querySelector('div[data-tab="10"][contenteditable="true"]') ||
            document.querySelector('div[data-lexical-editor="true"]') ||
            document.querySelector('[contenteditable="true"]');
   }
@@ -65,20 +72,33 @@
 
   // Metni WhatsApp giriş kutusuna güvenle yaz (React/Lexical uyumlu)
   function setInputText(inputEl, newText) {
+    if (!inputEl) return;
     inputEl.focus();
 
-    // 1. Kutudaki tüm mevcut metni seç
+    // 1. Kutudaki tüm mevcut metin düğümlerini bulup baştan sona seç
     const sel = window.getSelection();
     const range = document.createRange();
-    range.selectNodeContents(inputEl);
-    sel.removeAllRanges();
-    sel.addRange(range);
-    document.execCommand('selectAll', false, null);
 
-    // 2. Eski metni tamamen sil
-    document.execCommand('delete', false, null);
+    const walker = document.createTreeWalker(inputEl, NodeFilter.SHOW_TEXT, null, false);
+    let firstNode = null;
+    let lastNode = null;
+    while (walker.nextNode()) {
+      if (!firstNode) firstNode = walker.currentNode;
+      lastNode = walker.currentNode;
+    }
 
-    // 3. Yeni metni ekle
+    if (firstNode && lastNode) {
+      range.setStart(firstNode, 0);
+      range.setEnd(lastNode, lastNode.textContent.length);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } else {
+      range.selectNodeContents(inputEl);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+
+    // 2. Metni yerleştir: Önce execCommand insertText dene (seçili metni silip yerine yenisini yazar)
     let success = false;
     try {
       success = document.execCommand('insertText', false, newText);
@@ -86,32 +106,31 @@
       success = false;
     }
 
-    // 4. Kontrol: Eğer eski metin silinmediyse veya yanına eklendiyse
-    const currentBoxText = (inputEl.innerText || inputEl.textContent || '').trim();
-    if (!success || currentBoxText !== newText.trim()) {
-      document.execCommand('selectAll', false, null);
-      document.execCommand('delete', false, null);
-
+    // 3. Eğer execCommand başarısız olduysa, alternatif olarak DataTransfer Paste olayını kullan
+    if (!success) {
       try {
         const dt = new DataTransfer();
         dt.setData('text/plain', newText);
         const pasteEvent = new ClipboardEvent('paste', {
           bubbles: true,
           cancelable: true,
+          composed: true,
           clipboardData: dt
         });
         inputEl.dispatchEvent(pasteEvent);
-      } catch (err) {}
+        success = true;
+      } catch (err) {
+        success = false;
+      }
     }
 
-    // 5. Input ve Change olaylarını tetikle (React state senkronizasyonu için)
-    inputEl.dispatchEvent(new InputEvent('input', {
-      bubbles: true,
-      cancelable: true,
-      inputType: 'insertText',
-      data: newText
-    }));
+    // 4. Son çare fallback (nadir durumlar)
+    if (!success) {
+      inputEl.innerText = newText;
+    }
 
+    // 5. WhatsApp / React senkronizasyonu için genel eventleri tetikle
+    // (ASLA inputType: 'insertText' ile InputEvent çağırmayın, Lexical metni 2. kez ekler!)
     inputEl.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
     inputEl.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
   }
@@ -265,6 +284,11 @@
     button.setAttribute('aria-label', 'Yazımı ve Noktalamayı Düzelt (Option + D)');
     button.setAttribute('title', 'Yazımı & Noktalamayı Düzelt (Option + D veya Cmd+Shift+D)');
     button.innerHTML = WAND_SVG;
+
+    button.addEventListener('mousedown', (e) => {
+      // Butona tıklandığında mesaj kutusunun odağı (focus) ve seçimi kaybetmesini engeller
+      e.preventDefault();
+    });
 
     button.addEventListener('click', (e) => {
       e.preventDefault();
