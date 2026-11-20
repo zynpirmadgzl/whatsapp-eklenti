@@ -102,76 +102,72 @@
     if (!inputEl) return;
     inputEl.focus();
 
-    // 1. Çoklu paragraf varsa ilk paragraf dışındakileri temizle
-    const paragraphs = inputEl.querySelectorAll('p');
-    if (paragraphs.length > 1) {
-      for (let i = 1; i < paragraphs.length; i++) {
-        paragraphs[i].remove();
-      }
+    // 1. Kutudaki mevcut metin düğümlerini bulup baştan sona tam seçim oluştur
+    const sel = window.getSelection();
+    const range = document.createRange();
+
+    const walker = document.createTreeWalker(inputEl, NodeFilter.SHOW_TEXT, null, false);
+    let firstNode = null;
+    let lastNode = null;
+    while (walker.nextNode()) {
+      if (!firstNode) firstNode = walker.currentNode;
+      lastNode = walker.currentNode;
     }
 
-    // 2. İlk paragrafı al veya oluştur
-    let pTag = inputEl.querySelector('p');
-    if (!pTag) {
-      pTag = document.createElement('p');
-      pTag.className = 'selectable-text copyable-text';
-      inputEl.appendChild(pTag);
-    }
-
-    // 3. Paragraf içindeki tüm span'leri bul
-    const spans = pTag.querySelectorAll('span[data-lexical-text="true"]');
-    let targetSpan = null;
-
-    if (spans.length > 0) {
-      targetSpan = spans[0];
-      // İlk span dışındaki tüm span'leri (eski hatalı metin parçalarını) tamamen sil
-      for (let i = 1; i < spans.length; i++) {
-        spans[i].remove();
-      }
-      // Varsa paragraf içindeki diğer düğümleri temizle
-      Array.from(pTag.childNodes).forEach(child => {
-        if (child !== targetSpan) {
-          child.remove();
-        }
-      });
-    } else {
-      // Span yoksa pTag içeriğini tamamen temizleyip yeni bir Lexical span'i ekle
-      pTag.innerHTML = '';
-      targetSpan = document.createElement('span');
-      targetSpan.setAttribute('data-lexical-text', 'true');
-      pTag.appendChild(targetSpan);
-    }
-
-    // 4. Eski hatalı metni tamamen silip yerine yeni düzeltilmiş metni yaz
-    targetSpan.textContent = newText;
-
-    // 5. İmleci (caret) metnin sonuna taşı
-    try {
-      const sel = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(targetSpan);
-      range.collapse(false); // İmleci en sona koy
+    if (firstNode && lastNode) {
+      range.setStart(firstNode, 0);
+      range.setEnd(lastNode, lastNode.textContent.length);
       sel.removeAllRanges();
       sel.addRange(range);
-    } catch (e) {}
+    } else {
+      range.selectNodeContents(inputEl);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
 
-    // 6. Lexical'ın ve React'in DOM'daki yeni metni tanıması için InputEvent'leri tetikle
+    // 2. Seçili eski hatalı metni tamamen sil
+    document.execCommand('delete', false, null);
+
+    // Kontrol: Eğer eski metin silinmediyse DOM düğümünü doğrudan boşalt
+    if ((inputEl.innerText || inputEl.textContent || '').trim() !== '') {
+      range.selectNodeContents(inputEl);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      document.execCommand('delete', false, null);
+
+      if ((inputEl.innerText || inputEl.textContent || '').trim() !== '') {
+        const remainingWalker = document.createTreeWalker(inputEl, NodeFilter.SHOW_TEXT, null, false);
+        while (remainingWalker.nextNode()) {
+          remainingWalker.currentNode.textContent = '';
+        }
+      }
+    }
+
+    // 3. Yeni düzeltilmiş metni tek seferde ekle
+    let success = false;
     try {
-      inputEl.dispatchEvent(new InputEvent('beforeinput', {
-        bubbles: true,
-        cancelable: true,
-        inputType: 'insertReplacementText',
-        data: newText
-      }));
-    } catch (e) {}
+      success = document.execCommand('insertText', false, newText);
+    } catch (e) {
+      success = false;
+    }
 
-    inputEl.dispatchEvent(new InputEvent('input', {
-      bubbles: true,
-      cancelable: true,
-      inputType: 'insertText',
-      data: newText
-    }));
+    // 4. Eğer execCommand yazmadıysa, ClipboardEvent Paste ile yerleştir
+    const currentBoxText = (inputEl.innerText || inputEl.textContent || '').trim();
+    if (!success || !currentBoxText) {
+      try {
+        const dt = new DataTransfer();
+        dt.setData('text/plain', newText);
+        const pasteEvent = new ClipboardEvent('paste', {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          clipboardData: dt
+        });
+        inputEl.dispatchEvent(pasteEvent);
+      } catch (err) {}
+    }
 
+    // 5. WhatsApp React durumunu ve Gönder (uçak) butonunu tetikle
     inputEl.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
     inputEl.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
   }
