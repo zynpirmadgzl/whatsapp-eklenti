@@ -77,36 +77,77 @@
     if (!inputEl) return;
     inputEl.focus();
 
-    // 1. WhatsApp Lexical editöründeki tüm metni seç ve sil
-    document.execCommand('selectAll', false, null);
-    document.execCommand('delete', false, null);
+    // 1. Çoklu paragraf varsa ilk paragraf dışındakileri temizle
+    const paragraphs = inputEl.querySelectorAll('p');
+    if (paragraphs.length > 1) {
+      for (let i = 1; i < paragraphs.length; i++) {
+        paragraphs[i].remove();
+      }
+    }
 
-    // 2. Düzeltilmiş metni yerleştir
-    let success = false;
+    // 2. İlk paragrafı al veya oluştur
+    let pTag = inputEl.querySelector('p');
+    if (!pTag) {
+      pTag = document.createElement('p');
+      pTag.className = 'selectable-text copyable-text';
+      inputEl.appendChild(pTag);
+    }
+
+    // 3. Paragraf içindeki tüm span'leri bul
+    const spans = pTag.querySelectorAll('span[data-lexical-text="true"]');
+    let targetSpan = null;
+
+    if (spans.length > 0) {
+      targetSpan = spans[0];
+      // İlk span dışındaki tüm span'leri (eski hatalı metin parçalarını) tamamen sil
+      for (let i = 1; i < spans.length; i++) {
+        spans[i].remove();
+      }
+      // Varsa paragraf içindeki diğer düğümleri temizle
+      Array.from(pTag.childNodes).forEach(child => {
+        if (child !== targetSpan) {
+          child.remove();
+        }
+      });
+    } else {
+      // Span yoksa pTag içeriğini tamamen temizleyip yeni bir Lexical span'i ekle
+      pTag.innerHTML = '';
+      targetSpan = document.createElement('span');
+      targetSpan.setAttribute('data-lexical-text', 'true');
+      pTag.appendChild(targetSpan);
+    }
+
+    // 4. Eski hatalı metni tamamen silip yerine yeni düzeltilmiş metni yaz
+    targetSpan.textContent = newText;
+
+    // 5. İmleci (caret) metnin sonuna taşı
     try {
-      success = document.execCommand('insertText', false, newText);
-    } catch (e) {
-      success = false;
-    }
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(targetSpan);
+      range.collapse(false); // İmleci en sona koy
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch (e) {}
 
-    // 3. Eğer execCommand insertText başarısız olduysa veya metin kutusu boş kaldıysa, ClipboardEvent (Paste) ile yerleştir
-    const current = (inputEl.innerText || inputEl.textContent || '').trim();
-    if (!success || !current) {
-      try {
-        const dt = new DataTransfer();
-        dt.setData('text/plain', newText);
-        const pasteEvent = new ClipboardEvent('paste', {
-          bubbles: true,
-          cancelable: true,
-          composed: true,
-          clipboardData: dt
-        });
-        inputEl.dispatchEvent(pasteEvent);
-      } catch (err) {}
-    }
+    // 6. Lexical'ın ve React'in DOM'daki yeni metni tanıması için InputEvent'leri tetikle
+    try {
+      inputEl.dispatchEvent(new InputEvent('beforeinput', {
+        bubbles: true,
+        cancelable: true,
+        inputType: 'insertReplacementText',
+        data: newText
+      }));
+    } catch (e) {}
 
-    // 4. WhatsApp React durumunu ve Gönder (uçak) butonunu tetikle
-    inputEl.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true }));
+    inputEl.dispatchEvent(new InputEvent('input', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'insertText',
+      data: newText
+    }));
+
+    inputEl.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
     inputEl.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
   }
 
