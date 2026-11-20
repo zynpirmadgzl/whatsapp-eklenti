@@ -38,8 +38,10 @@
         return document.activeElement;
       }
     }
-    return document.querySelector('#main footer [contenteditable="true"]') ||
+    return document.querySelector('div[data-testid="conversation-compose-box-input"]') ||
+           document.querySelector('#main footer [contenteditable="true"]') ||
            document.querySelector('#main div[contenteditable="true"][data-lexical-editor="true"]') ||
+           document.querySelector('#main div[contenteditable="true"][data-tab="10"]') ||
            document.querySelector('#main [contenteditable="true"][role="textbox"]') ||
            document.querySelector('#main [contenteditable="true"]') ||
            document.querySelector('footer [contenteditable="true"]') ||
@@ -75,30 +77,11 @@
     if (!inputEl) return;
     inputEl.focus();
 
-    // 1. Kutudaki tüm mevcut metin düğümlerini bulup baştan sona seç
-    const sel = window.getSelection();
-    const range = document.createRange();
+    // 1. WhatsApp Lexical editöründeki tüm metni seç ve sil
+    document.execCommand('selectAll', false, null);
+    document.execCommand('delete', false, null);
 
-    const walker = document.createTreeWalker(inputEl, NodeFilter.SHOW_TEXT, null, false);
-    let firstNode = null;
-    let lastNode = null;
-    while (walker.nextNode()) {
-      if (!firstNode) firstNode = walker.currentNode;
-      lastNode = walker.currentNode;
-    }
-
-    if (firstNode && lastNode) {
-      range.setStart(firstNode, 0);
-      range.setEnd(lastNode, lastNode.textContent.length);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    } else {
-      range.selectNodeContents(inputEl);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    }
-
-    // 2. Metni yerleştir: Önce execCommand insertText dene (seçili metni silip yerine yenisini yazar)
+    // 2. Düzeltilmiş metni yerleştir
     let success = false;
     try {
       success = document.execCommand('insertText', false, newText);
@@ -106,8 +89,9 @@
       success = false;
     }
 
-    // 3. Eğer execCommand başarısız olduysa, alternatif olarak DataTransfer Paste olayını kullan
-    if (!success) {
+    // 3. Eğer execCommand insertText başarısız olduysa veya metin kutusu boş kaldıysa, ClipboardEvent (Paste) ile yerleştir
+    const current = (inputEl.innerText || inputEl.textContent || '').trim();
+    if (!success || !current) {
       try {
         const dt = new DataTransfer();
         dt.setData('text/plain', newText);
@@ -118,20 +102,11 @@
           clipboardData: dt
         });
         inputEl.dispatchEvent(pasteEvent);
-        success = true;
-      } catch (err) {
-        success = false;
-      }
+      } catch (err) {}
     }
 
-    // 4. Son çare fallback (nadir durumlar)
-    if (!success) {
-      inputEl.innerText = newText;
-    }
-
-    // 5. WhatsApp / React senkronizasyonu için genel eventleri tetikle
-    // (ASLA inputType: 'insertText' ile InputEvent çağırmayın, Lexical metni 2. kez ekler!)
-    inputEl.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    // 4. WhatsApp React durumunu ve Gönder (uçak) butonunu tetikle
+    inputEl.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true }));
     inputEl.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
   }
 
